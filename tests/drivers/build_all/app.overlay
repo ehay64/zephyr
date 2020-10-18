@@ -101,6 +101,7 @@
 				   <&test_gpio 0 0>,
 				   <&test_gpio 0 0>,
 				   <&test_gpio 0 0>,
+				   <&test_gpio 0 0>,
 				   <&test_gpio 0 0>;
 
 			#include "spi.dtsi"
@@ -191,6 +192,11 @@
 /* setup valid params for the device */
 &test_spi_enc28j60 {
 	local-mac-address = [00 00 00 00 00 00];
+};
+
+/* disable device to conflict with i2c version */
+&test_spi_iis2iclx {
+	status = "disabled";
 };
 
 /* disable device to conflict with i2c version */

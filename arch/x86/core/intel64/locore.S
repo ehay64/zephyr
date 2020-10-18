@@ -324,17 +324,23 @@ z_x86_switch:
  */
 
 __resume:
-#ifdef CONFIG_USERSPACE
-#ifndef CONFIG_X86_KPTI
+#if (!defined(CONFIG_X86_KPTI) && defined(CONFIG_USERSPACE)) \
+		|| defined(CONFIG_TRACING)
+	pushq %rdi	/* Caller-saved, stash it */
+#if !defined(CONFIG_X86_KPTI) && defined(CONFIG_USERSPACE)
 	/* If KPTI is enabled we're always on the kernel's page tables in
 	 * this context and the appropriate page table switch takes place
 	 * when trampolining back to user mode
 	 */
-	pushq %rdi	/* Caller-saved, stash it */
 	call z_x86_swap_update_page_tables
+#endif
+#ifdef CONFIG_TRACING
+	call sys_trace_thread_switched_in
+#endif
 	popq %rdi
-#endif /* CONFIG_X86_KPTI */
+#endif /* (!CONFIG_X86_KPTI && CONFIG_USERSPACE) || CONFIG_TRACING */
 
+#ifdef CONFIG_USERSPACE
 	/* Set up exception return stack frame */
 	pushq _thread_offset_to_ss(%rdi)	/* SS */
 #else
@@ -402,7 +408,6 @@ __resume:
 	/* swapgs variant of Spectre V1. Disable speculation past this point */
 	lfence
 #endif /* CONFIG_X86_BOUNDS_CHECK_BYPASS_MITIGATION */
-
 	iretq
 
 
@@ -1017,27 +1022,27 @@ gdt80:  /* LGDT descriptor for long mode */
 .global _exception_stack
 .align 16
 _exception_stack:
-	.fill CONFIG_EXCEPTION_STACK_SIZE, 1, 0xAA
+	.fill CONFIG_X86_EXCEPTION_STACK_SIZE, 1, 0xAA
 
 #if CONFIG_MP_NUM_CPUS > 1
 .global _exception_stack1
 .align 16
 _exception_stack1:
-	.fill CONFIG_EXCEPTION_STACK_SIZE, 1, 0xAA
+	.fill CONFIG_X86_EXCEPTION_STACK_SIZE, 1, 0xAA
 #endif
 
 #if CONFIG_MP_NUM_CPUS > 2
 .global _exception_stack2
 .align 16
 _exception_stack2:
-	.fill CONFIG_EXCEPTION_STACK_SIZE, 1, 0xAA
+	.fill CONFIG_X86_EXCEPTION_STACK_SIZE, 1, 0xAA
 #endif
 
 #if CONFIG_MP_NUM_CPUS > 3
 .global _exception_stack3
 .align 16
 _exception_stack3:
-	.fill CONFIG_EXCEPTION_STACK_SIZE, 1, 0xAA
+	.fill CONFIG_X86_EXCEPTION_STACK_SIZE, 1, 0xAA
 #endif
 
 #ifdef CONFIG_X86_KPTI

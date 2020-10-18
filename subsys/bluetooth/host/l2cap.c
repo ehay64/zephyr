@@ -54,13 +54,15 @@
 #define L2CAP_DISC_TIMEOUT	K_SECONDS(2)
 #define L2CAP_RTX_TIMEOUT	K_SECONDS(2)
 
+#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
 /* Dedicated pool for disconnect buffers so they are guaranteed to be send
  * even in case of data congestion due to flooding.
  */
 NET_BUF_POOL_FIXED_DEFINE(disc_pool, 1,
-			  BT_L2CAP_BUF_SIZE(CONFIG_BT_L2CAP_TX_MTU), NULL);
+			  BT_L2CAP_BUF_SIZE(
+				sizeof(struct bt_l2cap_disconn_req)),
+			  NULL);
 
-#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
 #define L2CAP_MAX_LE_MPS	CONFIG_BT_L2CAP_RX_MTU
 /* For now use MPS - SDU length to disable segmentation */
 #define L2CAP_MAX_LE_MTU	(L2CAP_MAX_LE_MPS - 2)
@@ -401,10 +403,11 @@ static struct net_buf *l2cap_create_le_sig_pdu(struct net_buf *buf,
 	struct bt_l2cap_sig_hdr *hdr;
 	struct net_buf_pool *pool = NULL;
 
+#if defined(CONFIG_BT_L2CAP_DYNAMIC_CHANNEL)
 	if (code == BT_L2CAP_DISCONN_REQ) {
 		pool = &disc_pool;
 	}
-
+#endif
 	/* Don't wait more than the minimum RTX timeout of 2 seconds */
 	buf = bt_l2cap_create_pdu_timeout(pool, 0, L2CAP_RTX_TIMEOUT);
 	if (!buf) {
@@ -778,6 +781,19 @@ static void l2cap_chan_rx_init(struct bt_l2cap_le_chan *chan)
 		chan->rx.mtu = L2CAP_MAX_LE_MTU;
 	}
 
+	/* MPS shall not be bigger than MTU + 2 as the remaining bytes cannot
+	 * be used.
+	 */
+	chan->rx.mps = MIN(chan->rx.mtu + 2, L2CAP_MAX_LE_MPS);
+
+	/* Truncate MTU if channel have disabled segmentation but still have
+	 * set an MTU which requires it.
+	 */
+	if (!chan->chan.ops->alloc_buf && (chan->rx.mps < chan->rx.mtu + 2)) {
+		BT_WARN("Segmentation disabled but MTU > MPS, truncating MTU");
+		chan->rx.mtu = chan->rx.mps - 2;
+	}
+
 	/* Use existing credits if defined */
 	if (!chan->rx.init_credits) {
 		if (chan->chan.ops->alloc_buf) {
@@ -790,10 +806,6 @@ static void l2cap_chan_rx_init(struct bt_l2cap_le_chan *chan)
 		}
 	}
 
-	/* MPS shall not be bigger than MTU + 2 as the remaining bytes cannot
-	 * be used.
-	 */
-	chan->rx.mps = MIN(chan->rx.mtu + 2, L2CAP_MAX_LE_MPS);
 	atomic_set(&chan->rx.credits,  0);
 
 	if (BT_DBG_ENABLED &&

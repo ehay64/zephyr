@@ -29,6 +29,7 @@
 #include "adv.h"
 #include "mesh.h"
 #include "net.h"
+#include "rpl.h"
 #include "beacon.h"
 #include "access.h"
 #include "foundation.h"
@@ -73,12 +74,14 @@
 #define PROV_ALG_P256          0x00
 
 enum {
-	WAIT_PUB_KEY,          /* Waiting for local PubKey to be generated */
-	LINK_ACTIVE,           /* Link has been opened */
-	WAIT_NUMBER,           /* Waiting for number input from user */
-	WAIT_STRING,           /* Waiting for string input from user */
-	NOTIFY_INPUT_COMPLETE, /* Notify that input has been completed. */
-	PROVISIONER,           /* The link was opened as provisioner */
+	WAIT_PUB_KEY,           /* Waiting for local PubKey to be generated */
+	LINK_ACTIVE,            /* Link has been opened */
+	WAIT_NUMBER,            /* Waiting for number input from user */
+	WAIT_STRING,            /* Waiting for string input from user */
+	NOTIFY_INPUT_COMPLETE,  /* Notify that input has been completed. */
+	PROVISIONER,            /* The link was opened as provisioner */
+	PUB_KEY_SENT,           /* Public key has been sent */
+	INPUT_COMPLETE,         /* Device input completed */
 
 	NUM_FLAGS,
 };
@@ -586,6 +589,15 @@ static void send_input_complete(void)
 	link.expect = PROV_CONFIRM;
 }
 
+static void input_complete(void)
+{
+	if (atomic_test_bit(link.flags, PUB_KEY_SENT)) {
+		send_input_complete();
+	} else {
+		atomic_set_bit(link.flags, INPUT_COMPLETE);
+	}
+}
+
 int bt_mesh_input_number(uint32_t num)
 {
 	BT_DBG("%u", num);
@@ -596,7 +608,7 @@ int bt_mesh_input_number(uint32_t num)
 
 	sys_put_be32(num, &link.auth[12]);
 
-	send_input_complete();
+	input_complete();
 
 	return 0;
 }
@@ -611,9 +623,19 @@ int bt_mesh_input_string(const char *str)
 
 	strncpy((char *)link.auth, str, prov->input_size);
 
-	send_input_complete();
+	input_complete();
 
 	return 0;
+}
+
+static void public_key_sent(int err, void *cb_data)
+{
+	atomic_set_bit(link.flags, PUB_KEY_SENT);
+
+	if (atomic_test_bit(link.flags, INPUT_COMPLETE)) {
+		send_input_complete();
+		return;
+	}
 }
 
 static void send_pub_key(void)
@@ -644,7 +666,7 @@ static void send_pub_key(void)
 		memcpy(&link.conf_inputs[81], &buf.data[1], 64);
 	}
 
-	if (prov_send(&buf, NULL)) {
+	if (prov_send(&buf, public_key_sent)) {
 		BT_ERR("Failed to send Public Key");
 		return;
 	}
@@ -883,6 +905,12 @@ static void prov_random(const uint8_t *data)
 	const uint8_t *prov_rand, *dev_rand;
 
 	BT_DBG("Remote Random: %s", bt_hex(data, 16));
+
+	if (!memcmp(data, link.rand, 16)) {
+		BT_ERR("Random value is identical to ours, rejecting.");
+		prov_fail(PROV_ERR_CFM_FAILED);
+		return;
+	}
 
 	if (bt_mesh_prov_conf(link.conf_key, data, link.auth, conf_verify)) {
 		BT_ERR("Unable to calculate confirmation verification");

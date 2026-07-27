@@ -56,6 +56,11 @@ class Patch(WestCommand):
                 Run "west patch apply" to apply patches.
                 See "west patch apply --help" for details.
 
+            Reverting Patches:
+
+                Run "west patch revert" to revert patches.
+                See "west patch revert --help" for details.
+
             Cleaning Patches:
 
                 Run "west patch clean" to clean patches.
@@ -176,6 +181,21 @@ class Patch(WestCommand):
         )
 
         subparsers.add_parser(
+            "revert",
+            help="Revert patches",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=textwrap.dedent(
+                """
+            Reverting Patches:
+
+                Run "west patch revert" to revert patches. Changes in the module
+                that are not part of a patch will be left in place. Patches are
+                reverted in reverse order of apply.
+            """
+            ),
+        )
+
+        subparsers.add_parser(
             "clean",
             help="Clean patches",
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -183,7 +203,9 @@ class Patch(WestCommand):
                 """
             Cleaning Patches:
 
-                Run "west patch clean" to clean patches.
+                Run "west patch clean" to clean patches. All changes in the
+                module will be reverted, including changes that are not part of
+                a patch.
             """
             ),
         )
@@ -334,12 +356,66 @@ class Patch(WestCommand):
 
         method = {
             "apply": self.apply,
+            "revert": self.revert,
             "clean": self.clean,
             "list": self.list,
             "gh-fetch": self.gh_fetch,
         }
 
         method[args.subcommand](args, yml, args.dst_modules)
+
+    def execute_on_patch(self, args, patch_info, command):
+        """
+        Execute an arbitrary command given the patch information.
+
+        Arguments:
+            - args: Patch command arguments
+            - patch_info: Patch information from the patches.yml file
+            - command: Command to execute (e.g. "git apply" or "git revert")
+
+        Returns:
+            - True: The command executed successfully
+            - False: The command failed to execute, or the hash check failed
+        """
+        mod = self.get_module_path(patch_info["module"])
+        if mod is None:
+            return False
+
+        mod_path = Path(args.west_workspace) / mod
+
+        pth = patch_info["path"]
+        patch_path = os.path.realpath(Path(args.patch_base) / pth)
+
+        self.dbg(f"reading patch file {pth}")
+        expect_sha256 = patch_info["sha256sum"]
+        try:
+            actual_sha256 = self.get_file_sha256sum(patch_path)
+        except Exception as e:
+            self.err(f"failed to read {pth}: {e}")
+            return False
+
+        if actual_sha256 != expect_sha256:
+            self.dbg("FAIL")
+            self.err(
+                f"sha256 mismatch for {pth}:\n"
+                f"expect: {expect_sha256}\n"
+                f"actual: {actual_sha256}"
+            )
+            return False
+        self.dbg("OK")
+
+        self.dbg(f"executing '{command}' for patch {pth} in module {mod}... ")
+        command_list = shlex.split(command)
+        command_list.extend([patch_path])
+        proc = subprocess.run(
+            command_list, capture_output=True, cwd=mod_path, encoding="utf-8"
+        )
+        if proc.returncode:
+            self.dbg("FAIL")
+            return False
+
+        self.dbg("OK")
+        return True
 
     def apply(self, args, yml, dst_mods=None):
         patches = yml.get("patches", [])
@@ -358,48 +434,20 @@ class Patch(WestCommand):
             if dst_mods and mod not in dst_mods:
                 continue
 
-            pth = patch_info["path"]
-            patch_path = os.path.realpath(Path(args.patch_base) / pth)
-
-            apply_cmd = patch_info["apply-command"]
-            apply_cmd_list = shlex.split(apply_cmd)
-
-            self.dbg(f"reading patch file {pth}")
-            expect_sha256 = patch_info["sha256sum"]
-            try:
-                actual_sha256 = self.get_file_sha256sum(patch_path)
-            except Exception as e:
-                self.err(f"failed to read {pth}: {e}")
-                failed_patch = pth
-                break
-
-            if actual_sha256 != expect_sha256:
-                self.dbg("FAIL")
-                self.err(
-                    f"sha256 mismatch for {pth}:\n"
-                    f"expect: {expect_sha256}\n"
-                    f"actual: {actual_sha256}"
-                )
-                failed_patch = pth
-                break
-            self.dbg("OK")
-            patch_count += 1
-
-            mod_path = Path(args.west_workspace) / mod
             patched_mods.add(mod)
 
-            self.dbg(f"patching {mod}... ", end="")
-            apply_cmd += patch_path
-            apply_cmd_list.extend([patch_path])
-            proc = subprocess.run(
-                apply_cmd_list, capture_output=True, cwd=mod_path, encoding="utf-8"
-            )
-            if proc.returncode:
-                self.dbg("FAIL")
-                self.err(proc.stderr)
-                failed_patch = pth
+            # Check if the patch has already been applied by trying to revert it
+            check_revert_cmd = patch_info["check-revert-command"]
+            if self.execute_on_patch(args, patch_info, check_revert_cmd):
+                self.inf(f"patch {patch_info['path']} already applied, skipping")
+                continue
+
+            apply_cmd = patch_info["apply-command"]
+            if not self.execute_on_patch(args, patch_info, apply_cmd):
+                failed_patch = patch_info["path"]
                 break
-            self.dbg("OK")
+
+            patch_count += 1
 
         if not failed_patch:
             self.inf(f"{patch_count} patches applied successfully \\o/")
@@ -409,6 +457,41 @@ class Patch(WestCommand):
             self.clean(args, yml, patched_mods)
 
         self.die(f"failed to apply patch {failed_patch}")
+
+    def revert(self, args, yml, dst_mods=None):
+        patches = yml.get("patches", [])
+        if not patches:
+            return
+
+        patch_count = 0
+        failed_patch = None
+
+        for patch_info in reversed(patches):
+            mod = self.get_module_path(patch_info["module"])
+            if mod is None:
+                continue
+
+            if dst_mods and mod not in dst_mods:
+                continue
+
+            # Check if the patch has already been reverted by trying to apply it
+            check_apply_cmd = patch_info["check-apply-command"]
+            if self.execute_on_patch(args, patch_info, check_apply_cmd):
+                self.inf(f"patch {patch_info['path']} already reverted, skipping")
+                continue
+
+            revert_cmd = patch_info["revert-command"]
+            if not self.execute_on_patch(args, patch_info, revert_cmd):
+                failed_patch = patch_info["path"]
+                break
+
+            patch_count += 1
+
+        if not failed_patch:
+            self.inf(f"{patch_count} patches reverted successfully \\o/")
+            return
+
+        self.die(f"failed to revert patch {failed_patch}")
 
     def clean(self, args, yml, dst_mods=None):
         clean_cmd = yml["clean-command"]

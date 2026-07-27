@@ -84,6 +84,21 @@ schema;patch-schema:
           type: str
           default: "git apply"
 
+        # The command used to check if the patch can be applied cleanly
+        check-apply-command:
+          type: str
+          default: "git apply --check"
+
+        # The command used to revert the change represented by the patch
+        revert-command:
+          type: str
+          default: "git apply --reverse"
+
+        # The command used to check if the patch can be reverted cleanly
+        check-revert-command:
+          type: str
+          default: "git apply --reverse --check"
+
         # Comments useful to other developers about the patch,
         # e.g. "This is a workaround for xyz and probably should not go upstream"
         comments:

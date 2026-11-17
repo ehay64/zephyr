@@ -101,12 +101,54 @@
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/mem_manage.h>
 
+#ifndef CONFIG_MMU
+/** @cond INTERNAL_HIDDEN */
+
+/* Local base, alias base and size of memory region node_id */
+#define Z_MEM_LOCAL_BASE(node_id) ((uintptr_t)DT_REG_ADDR(node_id))
+#define Z_MEM_ALIAS_BASE(node_id) ((uintptr_t)DT_REG_ADDR(DT_PHANDLE(node_id, zephyr_memory_alias)))
+#define Z_MEM_SIZE(node_id)       ((uintptr_t)DT_REG_SIZE(node_id))
+
+/* Ternary term moving addr from base "from" to base "to" if it lies within the region */
+#define Z_MEM_REMAP_TERM(addr, from, to, size)                                                     \
+	(((addr) - (from)) < (size)) ? (((addr) - (from)) + (to)) :
+
+#define Z_MEM_LOCAL_TO_ALIAS(node_id, addr)                                                        \
+	IF_ENABLED(DT_NODE_HAS_PROP(node_id, zephyr_memory_alias),                                 \
+		   (Z_MEM_REMAP_TERM(addr, Z_MEM_LOCAL_BASE(node_id), Z_MEM_ALIAS_BASE(node_id),   \
+				     Z_MEM_SIZE(node_id))))
+
+#define Z_MEM_ALIAS_TO_LOCAL(node_id, addr)                                                        \
+	IF_ENABLED(DT_NODE_HAS_PROP(node_id, zephyr_memory_alias),                                 \
+		   (Z_MEM_REMAP_TERM(addr, Z_MEM_ALIAS_BASE(node_id), Z_MEM_LOCAL_BASE(node_id),   \
+				     Z_MEM_SIZE(node_id))))
+
+/* Each region with an alias contributes one "cond ? remapped :" term */
+static inline uintptr_t z_mem_local_to_alias(uintptr_t addr)
+{
+	return DT_FOREACH_STATUS_OKAY_VARGS(zephyr_memory_region, Z_MEM_LOCAL_TO_ALIAS, addr) addr;
+}
+
+static inline uintptr_t z_mem_alias_to_local(uintptr_t addr)
+{
+	return DT_FOREACH_STATUS_OKAY_VARGS(zephyr_memory_region, Z_MEM_ALIAS_TO_LOCAL, addr) addr;
+}
+
+/** @endcond */
+#endif /* !CONFIG_MMU */
+
 /**
  * @brief Get physical address from virtual address.
  *
  * This only works in the kernel's permanent mapping of RAM.
  *
  * Just like K_MEM_PHYS_ADDR() but with type safety and assertions.
+ *
+ * Without an MMU, an address in a memory region that has a
+ * @c zephyr,memory-alias property is converted to the matching address in
+ * the alias region, which is how other bus masters reach that memory. If
+ * the address does not fall within any aliased region, it is returned
+ * unchanged.
  *
  * @param virt Virtual address
  *
@@ -139,7 +181,11 @@ static inline uintptr_t k_mem_phys_addr(void *virt)
 	 * the above checks won't be sufficient with demand paging
 	 */
 
+#ifdef CONFIG_MMU
 	return K_MEM_PHYS_ADDR(addr);
+#else
+	return z_mem_local_to_alias(addr);
+#endif /* CONFIG_MMU */
 }
 
 /**
@@ -149,25 +195,36 @@ static inline uintptr_t k_mem_phys_addr(void *virt)
  *
  * Just like K_MEM_VIRT_ADDR() but with type safety and assertions.
  *
+ * Without an MMU, an address in the alias of a memory region that has a
+ * @c zephyr,memory-alias property is converted back to the local address of
+ * that region. If the address does not fall within an aliased region, it is
+ * returned unchanged.
+ *
  * @param phys Physical address
  *
  * @return Virtual address.
  */
 static inline void *k_mem_virt_addr(uintptr_t phys)
 {
-#if defined(CONFIG_KERNEL_VM_USE_CUSTOM_MEM_RANGE_CHECK)
-	__ASSERT(sys_mm_is_phys_addr_in_range(phys),
-		"physical address 0x%lx not in RAM", (unsigned long)phys);
+#ifdef CONFIG_MMU
+	uintptr_t addr = phys;
 #else
-	__ASSERT(IS_SRAM_ADDRESS(phys),
-		 "physical address 0x%lx not in RAM", (unsigned long)phys);
+	uintptr_t addr = z_mem_alias_to_local(phys);
+#endif /* CONFIG_MMU */
+
+#if defined(CONFIG_KERNEL_VM_USE_CUSTOM_MEM_RANGE_CHECK)
+	__ASSERT(sys_mm_is_phys_addr_in_range(addr),
+		"physical address 0x%lx not in RAM", (unsigned long)addr);
+#else
+	__ASSERT(IS_SRAM_ADDRESS(addr),
+		 "physical address 0x%lx not in RAM", (unsigned long)addr);
 #endif /* CONFIG_KERNEL_VM_USE_CUSTOM_MEM_RANGE_CHECK */
 
 	/* TODO add assertion that this page frame is pinned to boot mapping,
 	 * the above check won't be sufficient with demand paging
 	 */
 
-	return (void *)K_MEM_VIRT_ADDR(phys);
+	return (void *)K_MEM_VIRT_ADDR(addr);
 }
 
 #ifdef __cplusplus

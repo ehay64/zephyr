@@ -26,5 +26,11 @@ properties:
       'include/zephyr/dt-bindings/memory-attr/memory-attr.h' for a
       comprehensive list with description of possible values.
 
+  zephyr,memory-alias:
+    type: phandle
+    description: |
+      This memory region can also be accessed using the alias specified here.
+      Useful for ITCM/DTCM local to global memory address translation.
+
   reg:
     required: true

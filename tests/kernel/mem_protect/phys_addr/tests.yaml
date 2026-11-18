@@ -1,0 +1,13 @@
+common:
+  tags:
+    - kernel
+  filter: not CONFIG_MMU
+  platform_allow:
+    - qemu_cortex_m3
+  integration_platforms:
+    - qemu_cortex_m3
+tests:
+  kernel.memory_protection.phys_addr.alias:
+    extra_args:
+      - FILE_SUFFIX=alias
+  kernel.memory_protection.phys_addr.no_alias: {}

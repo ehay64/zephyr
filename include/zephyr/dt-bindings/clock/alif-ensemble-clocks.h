@@ -89,6 +89,8 @@
 /** Clock enable register offset in CGU */
 #define ALIF_CLK_ENA_REG		0x14U
 
+/** Camera pixel clock register offset in CLKCTL_PER_MST */
+#define ALIF_CAMERA_PIXCLK_CTRL_REG 0x00U
 /** Peripheral clock enable register offset in CLKCTL_PER_MST */
 #define ALIF_PERIPH_CLK_ENA_REG		0x0CU
 /** Ethernet control register offset in CLKCTL_PER_MST */
@@ -246,5 +248,34 @@
 	ALIF_CLK_CFG(CGU, CLK_ENA, 7U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
 
 /** @} */
+
+/**
+ * @name Camera clocks
+ *
+ * The CPI controller requires three clocks:
+ * - ACLK, the AXI interface clock
+ * - PCLK, the APB interface clock
+ * - PIXEL_CLK, the camera pixel clock
+ *
+ * The ACLK and PCLK clocks are gated with the single bit in the PERIPH_CLK_ENA
+ * register, while the PIXEL_CLK is controlled separately depending on its
+ * source.
+ *
+ * The PIXEL_CLK can be sourced internally or externally. When CSI is used, it
+ * is sourced internally from either SYST_ACLK or 400M_CLK. When the parallel
+ * interface is used, it is sourced externally from the CAM_PCLK pin. Polarity
+ * of the external clock can be configured as needed via the CPI driver.
+ */
+
+/** Camera CPI clock gate */
+#define ALIF_CPI_CLK                                                                               \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, PERIPH_CLK_ENA, 0U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_SYST_PCLK)
+/** Camera pixel clock sourced from system ACLK */
+#define ALIF_CAMERA_PIXEL_CLK_SYST_ACLK                                                            \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, CAMERA_PIXCLK_CTRL, 0U, 1U, 0U, 1U, 4U,                       \
+		     ALIF_PARENT_CLK_SYST_ACLK)
+/** Camera pixel clock sourced from 400M_CLK */
+#define ALIF_CAMERA_PIXEL_CLK_400M                                                                 \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, CAMERA_PIXCLK_CTRL, 0U, 1U, 1U, 1U, 4U, ALIF_PARENT_CLK_400M)
 
 #endif /* ZEPHYR_INCLUDE_DT_BINDINGS_CLOCK_ALIF_ENSEMBLE_CLOCKS_H_ */

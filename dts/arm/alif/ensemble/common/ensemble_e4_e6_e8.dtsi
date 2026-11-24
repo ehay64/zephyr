@@ -169,6 +169,18 @@
 		status = "disabled";
 	};
 
+	cam: cam@49030000 {
+		compatible = "alif,cam";
+		reg = <0x49030000 0x1000>;
+		clocks = <&clockctrl ALIF_CPI_CLK>,
+			 <&clockctrl ALIF_CAMERA_PIXEL_CLK_SYST_ACLK>;
+		clock-names = "cam_clk", "pix_clk";
+		fifo-wr-wmark = <0x18>;
+		fifo-rd-wmark = <0x08>;
+		wait-vsync;
+		status = "disabled";
+	};
+
 	mram_flash: flash-controller@80000000 {
 		compatible = "alif,mram-flash-controller";
 		reg = <0x80000000 DT_SIZE_K(5632)>;

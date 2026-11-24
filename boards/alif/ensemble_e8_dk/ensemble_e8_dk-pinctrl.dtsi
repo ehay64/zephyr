@@ -168,4 +168,11 @@
 			bias-pull-up;
 		};
 	};
+
+	cam_default: cam_default {
+		group0 {
+			/* XVCLK output for external camera modules */
+			pinmux = <PIN_P0_3__CAM_XVCLK_A>;
+		};
+	};
 };

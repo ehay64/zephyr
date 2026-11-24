@@ -133,3 +133,8 @@
 	interrupt-parent = <&nvic>;
 	interrupts = <148 0>;
 };
+
+&cam {
+	interrupt-parent = <&nvic>;
+	interrupts = <345 0>;
+};

@@ -133,3 +133,8 @@
 	interrupt-parent = <&gic>;
 	interrupts = <GIC_SPI 137 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 };
+
+&cam {
+	interrupt-parent = <&gic>;
+	interrupts = <GIC_SPI 334 IRQ_TYPE_EDGE IRQ_DEFAULT_PRIORITY>;
+};

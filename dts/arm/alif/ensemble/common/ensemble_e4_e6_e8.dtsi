@@ -181,6 +181,23 @@
 		status = "disabled";
 	};
 
+	dphy: dphy@4903f000 {
+		compatible = "snps,designware-dphy";
+		reg = <0x4903f000 0x40>,
+		      <0x49033000 0x1000>,
+		      <0x49032000 0x1000>;
+		reg-names = "expmst_reg", "csi_reg", "dsi_reg";
+		#dphy-cells = <1>;
+		clocks = <&clockctrl ALIF_MIPI_PLLREF_CLK>,
+			 <&clockctrl ALIF_MIPI_BYPASS_CLK>,
+			 <&clockctrl ALIF_MIPI_TXDPHY_CLK>,
+			 <&clockctrl ALIF_MIPI_RXDPHY_CLK>;
+		clock-names = "pllref-clk", "pllbypass-clk", "tx-dphy-clk", "rx-dphy-clk" ;
+		ref-frequency = <38400000>;
+		cfg-clk-frequency = <25000000>;
+		status = "disabled";
+	};
+
 	mram_flash: flash-controller@80000000 {
 		compatible = "alif,mram-flash-controller";
 		reg = <0x80000000 DT_SIZE_K(5632)>;

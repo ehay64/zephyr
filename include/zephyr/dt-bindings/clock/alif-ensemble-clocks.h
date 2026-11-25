@@ -93,6 +93,8 @@
 #define ALIF_CAMERA_PIXCLK_CTRL_REG 0x00U
 /** Peripheral clock enable register offset in CLKCTL_PER_MST */
 #define ALIF_PERIPH_CLK_ENA_REG		0x0CU
+/** MIPI D-PHY clock enable register offset in CLKCTL_PER_MST */
+#define ALIF_MIPI_CKEN_REG		0x40U
 /** Ethernet control register offset in CLKCTL_PER_MST */
 #define ALIF_ETH_CTRL0_REG		0x80U
 
@@ -265,6 +267,8 @@
  * is sourced internally from either SYST_ACLK or 400M_CLK. When the parallel
  * interface is used, it is sourced externally from the CAM_PCLK pin. Polarity
  * of the external clock can be configured as needed via the CPI driver.
+ *
+ * @{
  */
 
 /** Camera CPI clock gate */
@@ -278,4 +282,25 @@
 #define ALIF_CAMERA_PIXEL_CLK_400M                                                                 \
 	ALIF_CLK_CFG(CLKCTL_PER_MST, CAMERA_PIXCLK_CTRL, 0U, 1U, 1U, 1U, 4U, ALIF_PARENT_CLK_400M)
 
+/** @} */
+
+/**
+ * @name MIPI D-PHY clocks
+ *
+ * @{
+ */
+/** Reference clock for MIPI D-PHY PLL */
+#define ALIF_MIPI_PLLREF_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, MIPI_CKEN, 8U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
+/** Enable bypass clock for MIPI D-PHY */
+#define ALIF_MIPI_BYPASS_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, MIPI_CKEN, 12U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
+/** MIPI TX D-PHY clock gate */
+#define ALIF_MIPI_TXDPHY_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, MIPI_CKEN, 0U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
+/** MIPI RX D-PHY clock gate */
+#define ALIF_MIPI_RXDPHY_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, MIPI_CKEN, 4U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
+
+/** @} */
 #endif /* ZEPHYR_INCLUDE_DT_BINDINGS_CLOCK_ALIF_ENSEMBLE_CLOCKS_H_ */

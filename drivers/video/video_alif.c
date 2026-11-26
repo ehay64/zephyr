@@ -958,6 +958,7 @@ static int alif_video_cam_init(const struct device *dev)
 			return ret;
 		}
 
+#if 0
 		/* XVCLK = SYST_ACLK (400 MHz) / 20 = 20 MHz */
 		ret = clock_control_set_rate(config->clk_dev, config->pixclk,
 					      (clock_control_subsys_rate_t)CPI_PIXEL_CLOCK);
@@ -966,6 +967,7 @@ static int alif_video_cam_init(const struct device *dev)
 			clock_control_off(config->clk_dev, config->pixclk);
 			return ret;
 		}
+#endif
 	}
 
 	/*
@@ -1166,6 +1168,7 @@ static int alif_cam_resume(const struct device *dev)
 			return ret;
 		}
 
+#if 0
 		/* XVCLK = SYST_ACLK (400 MHz) / 20 = 20 MHz */
 		ret = clock_control_set_rate(config->clk_dev, config->pixclk,
 					      (clock_control_subsys_rate_t)CPI_PIXEL_CLOCK);
@@ -1174,6 +1177,7 @@ static int alif_cam_resume(const struct device *dev)
 			clock_control_off(config->clk_dev, config->pixclk);
 			return ret;
 		}
+#endif
 	}
 
 	/* Re-enable CPI clock lost during deep sleep (STOP mode) */

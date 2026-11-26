@@ -91,6 +91,8 @@
 
 /** Camera pixel clock register offset in CLKCTL_PER_MST */
 #define ALIF_CAMERA_PIXCLK_CTRL_REG 0x00U
+/** MIPI CSI-2 pixel clock register offset in CLKCTL_PER_MST */
+#define ALIF_CSI_PIXCLK_CTRL_REG	0x08U
 /** Peripheral clock enable register offset in CLKCTL_PER_MST */
 #define ALIF_PERIPH_CLK_ENA_REG		0x0CU
 /** MIPI D-PHY clock enable register offset in CLKCTL_PER_MST */
@@ -301,6 +303,24 @@
 /** MIPI RX D-PHY clock gate */
 #define ALIF_MIPI_RXDPHY_CLK \
 	ALIF_CLK_CFG(CLKCTL_PER_MST, MIPI_CKEN, 4U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_100M)
+
+/** @} */
+
+/**
+ * @name MIPI CSI-2 clocks
+ *
+ * @{
+ */
+
+/** MIPI CSI-2 clock gate */
+#define ALIF_CSI_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, PERIPH_CLK_ENA, 24U, 1U, 0U, 0U, 0U, ALIF_PARENT_CLK_SYST_PCLK)
+/** MIPI CSI-2 pixel clock sourced from system ACLK */
+#define ALIF_CSI_PIX_SYST_ACLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, CSI_PIXCLK_CTRL, 0U, 1U, 0U, 1U, 4U, ALIF_PARENT_CLK_SYST_ACLK)
+/** MIPI CSI-2 pixel clock sourced from 400M_CLK */
+#define ALIF_CSI_PIX_400M_CLK \
+	ALIF_CLK_CFG(CLKCTL_PER_MST, CSI_PIXCLK_CTRL, 0U, 1U, 1U, 1U, 4U, ALIF_PARENT_CLK_400M)
 
 /** @} */
 #endif /* ZEPHYR_INCLUDE_DT_BINDINGS_CLOCK_ALIF_ENSEMBLE_CLOCKS_H_ */

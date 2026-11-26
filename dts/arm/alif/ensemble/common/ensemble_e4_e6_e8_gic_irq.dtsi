@@ -138,3 +138,8 @@
 	interrupt-parent = <&gic>;
 	interrupts = <GIC_SPI 334 IRQ_TYPE_EDGE IRQ_DEFAULT_PRIORITY>;
 };
+
+&csi {
+	interrupt-parent = <&gic>;
+	interrupts = <GIC_SPI 333 IRQ_TYPE_EDGE IRQ_DEFAULT_PRIORITY>;
+};
